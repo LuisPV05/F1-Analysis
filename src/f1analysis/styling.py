@@ -68,8 +68,11 @@ def get_driver_style(driver_code, race, styles=None):
     return style
 
 
-def add_sorted_driver_legend(ax, race):
-    """Leyenda con los pilotos ordenados por posición final en la carrera."""
+def add_sorted_driver_legend(ax, race, **legend_kwargs):
+    """Leyenda con los pilotos ordenados por posición final en la carrera.
+
+    Los argumentos extra (loc, bbox_to_anchor...) se pasan a ax.legend.
+    """
     finishing = {
         code: i
         for i, code in enumerate(race.sort_values("position")["driverCode"])
@@ -78,5 +81,5 @@ def add_sorted_driver_legend(ax, race):
     pairs = sorted(zip(handles, labels), key=lambda p: finishing.get(p[1], 99))
     if pairs:
         sorted_handles, sorted_labels = zip(*pairs)
-        return ax.legend(sorted_handles, sorted_labels)
+        return ax.legend(sorted_handles, sorted_labels, **legend_kwargs)
     return None

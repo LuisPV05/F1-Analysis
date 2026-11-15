@@ -101,7 +101,7 @@ def get_laps(season, round_):
     """Todas las vueltas de la carrera, con piloto, escudería y stint.
 
     Columnas: lap, driverId, position, time, seconds, driverCode,
-    constructorName, stint.
+    constructorId, constructorName, stint.
     """
     laps = _fetch_all(Ergast().get_lap_times, season, round_)
     if laps.empty:
@@ -110,10 +110,12 @@ def get_laps(season, round_):
         )
 
     laps = laps.rename(columns={"number": "lap"})
+    laps["lap"] = pd.to_numeric(laps["lap"])
+    laps["position"] = pd.to_numeric(laps["position"], errors="coerce")
     laps["seconds"] = laps["time"].apply(to_seconds)
 
     race = get_race_results(season, round_)
-    drivers = race[["driverId", "driverCode", "constructorName"]]
+    drivers = race[["driverId", "driverCode", "constructorId", "constructorName"]]
     laps = laps.merge(drivers, on="driverId", how="left")
 
     return add_stints(laps, get_pit_stops(season, round_))

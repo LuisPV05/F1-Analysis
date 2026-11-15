@@ -19,8 +19,11 @@ from f1analysis.data import get_laps, get_qualifying, get_race_results
 from f1analysis.plots import (
     plot_driver_laptimes,
     plot_laptime_distribution,
+    plot_position_changes,
     plot_qualifying_delta,
     plot_race_pace,
+    plot_strategy,
+    plot_team_pace,
 )
 
 OUTPUT_DIR = Path("outputs")
@@ -45,6 +48,13 @@ def parse_args():
     return parser.parse_args()
 
 
+def save(fig, filename, saved):
+    """Guarda la figura en outputs/ y apunta la ruta."""
+    path = OUTPUT_DIR / filename
+    fig.savefig(path, dpi=150)
+    saved.append(path)
+
+
 def main():
     args = parse_args()
     season, round_ = args.season, args.round
@@ -60,9 +70,7 @@ def main():
     fig = plot_qualifying_delta(
         qualifying, f"Clasificación {race_name}: diferencia con la pole"
     )
-    path = OUTPUT_DIR / f"qualifying_delta_{suffix}.png"
-    fig.savefig(path, dpi=150)
-    saved.append(path)
+    save(fig, f"qualifying_delta_{suffix}.png", saved)
 
     # --- Vueltas ---
     laps = get_laps(season, round_)
@@ -79,32 +87,38 @@ def main():
     fig = plot_race_pace(
         laps, race, top, f"Ritmo de carrera {race_name} (top {args.top})"
     )
-    path = OUTPUT_DIR / f"race_pace_{suffix}.png"
-    fig.savefig(path, dpi=150)
-    saved.append(path)
+    save(fig, f"race_pace_{suffix}.png", saved)
 
     # Dispersión de vueltas de un piloto (por defecto, el ganador)
     driver = args.driver or top[0]
     fig = plot_driver_laptimes(
         laps, driver, f"Tiempos de vuelta de {driver} - {race_name}"
     )
-    path = OUTPUT_DIR / f"laptimes_{driver}_{suffix}.png"
-    fig.savefig(path, dpi=150)
-    saved.append(path)
+    save(fig, f"laptimes_{driver}_{suffix}.png", saved)
 
     # Distribución de vueltas de los puntuables
     fig = plot_laptime_distribution(
         laps, race, f"Distribución de tiempos de vuelta - {race_name}"
     )
-    path = OUTPUT_DIR / f"laptimes_distribution_{suffix}.png"
-    fig.savefig(path, dpi=150)
-    saved.append(path)
+    save(fig, f"laptimes_distribution_{suffix}.png", saved)
+
+    # --- Estrategia y resultados ---
+    fig = plot_position_changes(laps, race, f"Cambios de posición - {race_name}")
+    save(fig, f"position_changes_{suffix}.png", saved)
+
+    fig = plot_team_pace(laps, f"Ritmo por escudería - {race_name}")
+    save(fig, f"team_pace_{suffix}.png", saved)
+
+    fig = plot_strategy(laps, race, f"Estrategias por stints - {race_name}")
+    save(fig, f"strategy_{suffix}.png", saved)
 
     print()
     for path in saved:
         print(f"Guardado: {path}")
 
-    if not args.no_show:
+    if args.no_show:
+        plt.close("all")
+    else:
         plt.show()
 
 
