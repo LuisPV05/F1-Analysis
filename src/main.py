@@ -61,7 +61,9 @@ def main():
     print(best_lap_per_driver(laps))
 
     top = race.sort_values("position")["driverCode"].head(args.top).tolist()
-    fig_p = plot_race_pace(laps, top, f"Ritmo de carrera {race_name} (top {args.top})")
+    fig_p = plot_race_pace(
+        laps, race, top, f"Ritmo de carrera {race_name} (top {args.top})"
+    )
     path_p = OUTPUT_DIR / f"race_pace_{season}_r{round_}.png"
     fig_p.savefig(path_p, dpi=150)
 
