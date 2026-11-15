@@ -1,6 +1,6 @@
 # F1-Analysis
 
-Análisis de datos de Fórmula 1 con Python: resultados de carrera, clasificación, tiempos por vuelta, ritmo de carrera y distribución de tiempos, usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
+Análisis de datos de Fórmula 1 con Python: resultados de carrera, clasificación, tiempos por vuelta, ritmo de carrera, cambios de posición y estrategias, usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
 
 Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se reorganizó en un paquete reutilizable con una herramienta de línea de comandos.
 
@@ -8,21 +8,25 @@ Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a pas
 
 Ejemplo con el GP de Francia 2021 (`--season 2021 --round 7`).
 
-**Diferencia con la pole en clasificación**
+### Clasificación
 
 ![Diferencia con la pole](outputs/qualifying_delta_2021_r7.png)
 
-**Ritmo de carrera de los 4 primeros**
+### Ritmo y tiempos de vuelta
 
 ![Ritmo de carrera](outputs/race_pace_2021_r7.png)
 
-**Tiempos de vuelta de un piloto, coloreados por stint**
-
 ![Tiempos de vuelta de Verstappen](outputs/laptimes_VER_2021_r7.png)
 
-**Distribución de tiempos de vuelta de los 10 primeros**
-
 ![Distribución de tiempos de vuelta](outputs/laptimes_distribution_2021_r7.png)
+
+### Estrategia y resultados
+
+![Cambios de posición](outputs/position_changes_2021_r7.png)
+
+![Ritmo por escudería](outputs/team_pace_2021_r7.png)
+
+![Estrategias por stints](outputs/strategy_2021_r7.png)
 
 ## Qué hace
 
@@ -30,7 +34,7 @@ Ejemplo con el GP de Francia 2021 (`--season 2021 --round 7`).
 - Obtiene los tiempos de todas las vueltas y las paradas en boxes (con paginación de la API).
 - Deduce los stints de cada piloto a partir de las paradas.
 - Calcula la vuelta rápida y la mejor vuelta de cada piloto.
-- Genera cuatro gráficas con matplotlib y seaborn, con colores de escudería, y las guarda en `outputs/` con la temporada y la ronda en el nombre.
+- Genera siete gráficas con matplotlib y seaborn, con colores de escudería, y las guarda en `outputs/` con la temporada y la ronda en el nombre.
 
 ## Datos y limitaciones
 
@@ -41,7 +45,7 @@ Desde octubre de 2026, Formula 1 exige autenticación (suscripción F1TV Access 
 Las contrapartidas son:
 
 - **No hay telemetría** (velocidad, freno, acelerador, posición en pista).
-- **No hay compuesto de neumático** (blando, medio, duro). Como sustituto, las gráficas de tiempos de vuelta se colorean por **stint**, deducido de las paradas en boxes.
+- **No hay compuesto de neumático** (blando, medio, duro). Como sustituto, las gráficas se colorean por **stint**, deducido de las paradas en boxes.
 
 ## Instalación
 
@@ -79,7 +83,7 @@ Ejemplo sin abrir ventanas:
 py src/main.py --season 2023 --round 1 --top 5 --driver ALO --no-show
 ```
 
-El programa muestra por consola la vuelta rápida y la mejor vuelta de cada piloto, y guarda cuatro gráficas en `outputs/`.
+El programa muestra por consola la vuelta rápida y la mejor vuelta de cada piloto, y guarda siete gráficas en `outputs/`.
 
 ## Estructura
 
@@ -118,7 +122,7 @@ Los scripts numerados son los primeros pasos de aprendizaje y se conservan como 
 - [x] Elegir temporada y ronda desde la línea de comandos.
 - [x] Estilo por piloto con colores de escudería y leyenda ordenada.
 - [x] Dispersión y distribución de tiempos de vuelta.
-- [ ] Estrategia y resultados: cambios de posición durante la carrera, ritmo por equipos y estrategia por stints.
+- [x] Estrategia y resultados: cambios de posición, ritmo por equipos y estrategia por stints.
 - [ ] Clasificaciones de pilotos y constructores durante la temporada.
 - [ ] Mover los scripts de ejemplo a una carpeta `examples/`.
 - [ ] Comparativas entre temporadas.
