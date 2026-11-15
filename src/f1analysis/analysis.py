@@ -25,3 +25,13 @@ def clean_race_laps(driver_laps, factor=1.07):
     """
     limit = driver_laps["seconds"].median() * factor
     return driver_laps[driver_laps["seconds"] < limit]
+
+
+def quick_laps(laps, threshold=1.07):
+    """Equivalente a pick_quicklaps de FastF1.
+
+    Se queda con las vueltas de menos de threshold * la vuelta más rápida
+    del conjunto recibido (descarta boxes, banderas amarillas, VSC...).
+    """
+    limit = laps["seconds"].min() * threshold
+    return laps[laps["seconds"] < limit]

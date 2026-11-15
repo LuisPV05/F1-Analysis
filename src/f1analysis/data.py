@@ -30,6 +30,29 @@ def _first_table(response, season, round_):
     return response.content[0].copy()
 
 
+def _fetch_all(method, season, round_):
+    """Descarga todas las páginas de una consulta paginada.
+
+    Devuelve un DataFrame (vacío si no hay datos).
+    """
+    frames = []
+    offset = 0
+    while True:
+        response = method(
+            season=season, round=round_, limit=PAGE_SIZE, offset=offset
+        )
+        if not response.content or response.content[0].empty:
+            break
+        page = response.content[0]
+        frames.append(page)
+        if len(page) < PAGE_SIZE:
+            break
+        offset += PAGE_SIZE
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
 def get_race_results(season, round_):
     """Resultado de la carrera."""
     response = Ergast().get_race_results(season=season, round=round_)
@@ -46,36 +69,51 @@ def get_qualifying(season, round_):
     return df
 
 
+def get_pit_stops(season, round_):
+    """Paradas en boxes. Columnas útiles: driverId, stop, lap.
+
+    Si la API no tiene paradas para esa carrera, devuelve un DataFrame vacío.
+    """
+    pit = _fetch_all(Ergast().get_pit_stops, season, round_)
+    if pit.empty:
+        return pd.DataFrame(columns=["driverId", "stop", "lap"])
+    pit["lap"] = pd.to_numeric(pit["lap"])
+    return pit
+
+
+def add_stints(laps, pit_stops):
+    """Añade la columna 'stint' (1, 2, 3...) a cada vuelta.
+
+    Una vuelta pertenece al stint siguiente si el piloto ya había parado
+    en una vuelta anterior. La vuelta de entrada a boxes cuenta aún para el
+    stint que termina.
+    """
+    pit_laps = pit_stops.groupby("driverId")["lap"].apply(list).to_dict()
+    laps = laps.copy()
+    laps["stint"] = [
+        1 + sum(pit_lap < lap for pit_lap in pit_laps.get(driver, []))
+        for driver, lap in zip(laps["driverId"], laps["lap"])
+    ]
+    return laps
+
+
 def get_laps(season, round_):
-    """Todas las vueltas de la carrera, con piloto y escudería.
+    """Todas las vueltas de la carrera, con piloto, escudería y stint.
 
     Columnas: lap, driverId, position, time, seconds, driverCode,
-    constructorName.
+    constructorName, stint.
     """
-    ergast = Ergast()
-    frames = []
-    offset = 0
-    while True:
-        response = ergast.get_lap_times(
-            season=season, round=round_, limit=PAGE_SIZE, offset=offset
-        )
-        if not response.content or response.content[0].empty:
-            break
-        page = response.content[0]
-        frames.append(page)
-        if len(page) < PAGE_SIZE:
-            break
-        offset += PAGE_SIZE
-
-    if not frames:
+    laps = _fetch_all(Ergast().get_lap_times, season, round_)
+    if laps.empty:
         raise ValueError(
             f"No hay vueltas para la temporada {season}, ronda {round_}."
         )
 
-    laps = pd.concat(frames, ignore_index=True)
     laps = laps.rename(columns={"number": "lap"})
     laps["seconds"] = laps["time"].apply(to_seconds)
 
     race = get_race_results(season, round_)
     drivers = race[["driverId", "driverCode", "constructorName"]]
-    return laps.merge(drivers, on="driverId", how="left")
+    laps = laps.merge(drivers, on="driverId", how="left")
+
+    return add_stints(laps, get_pit_stops(season, round_))

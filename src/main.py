@@ -2,7 +2,7 @@
 
 Ejemplo:
     py src/main.py --season 2021 --round 7
-    py src/main.py --season 2023 --round 1 --top 5 --no-show
+    py src/main.py --season 2023 --round 1 --top 5 --driver ALO --no-show
 """
 
 import argparse
@@ -16,7 +16,12 @@ from f1analysis.analysis import (
     qualifying_delta,
 )
 from f1analysis.data import get_laps, get_qualifying, get_race_results
-from f1analysis.plots import plot_qualifying_delta, plot_race_pace
+from f1analysis.plots import (
+    plot_driver_laptimes,
+    plot_laptime_distribution,
+    plot_qualifying_delta,
+    plot_race_pace,
+)
 
 OUTPUT_DIR = Path("outputs")
 
@@ -27,6 +32,12 @@ def parse_args():
     parser.add_argument("--round", type=int, required=True, help="Número de ronda")
     parser.add_argument(
         "--top", type=int, default=4, help="Pilotos a mostrar en el ritmo (def. 4)"
+    )
+    parser.add_argument(
+        "--driver",
+        type=str,
+        default=None,
+        help="Código del piloto para la dispersión de vueltas (def. ganador)",
     )
     parser.add_argument(
         "--no-show", action="store_true", help="Guardar las gráficas sin abrirlas"
@@ -41,16 +52,19 @@ def main():
 
     race = get_race_results(season, round_)
     race_name = f"{season} ronda {round_}"
+    suffix = f"{season}_r{round_}"
+    saved = []
 
     # --- Clasificación ---
     qualifying = qualifying_delta(get_qualifying(season, round_))
-    fig_q = plot_qualifying_delta(
+    fig = plot_qualifying_delta(
         qualifying, f"Clasificación {race_name}: diferencia con la pole"
     )
-    path_q = OUTPUT_DIR / f"qualifying_delta_{season}_r{round_}.png"
-    fig_q.savefig(path_q, dpi=150)
+    path = OUTPUT_DIR / f"qualifying_delta_{suffix}.png"
+    fig.savefig(path, dpi=150)
+    saved.append(path)
 
-    # --- Vueltas y ritmo ---
+    # --- Vueltas ---
     laps = get_laps(season, round_)
     best = fastest_lap(laps)
     print(
@@ -60,15 +74,35 @@ def main():
     print("\nMejor vuelta por piloto:")
     print(best_lap_per_driver(laps))
 
+    # Ritmo de los primeros
     top = race.sort_values("position")["driverCode"].head(args.top).tolist()
-    fig_p = plot_race_pace(
+    fig = plot_race_pace(
         laps, race, top, f"Ritmo de carrera {race_name} (top {args.top})"
     )
-    path_p = OUTPUT_DIR / f"race_pace_{season}_r{round_}.png"
-    fig_p.savefig(path_p, dpi=150)
+    path = OUTPUT_DIR / f"race_pace_{suffix}.png"
+    fig.savefig(path, dpi=150)
+    saved.append(path)
 
-    print(f"\nGuardado: {path_q}")
-    print(f"Guardado: {path_p}")
+    # Dispersión de vueltas de un piloto (por defecto, el ganador)
+    driver = args.driver or top[0]
+    fig = plot_driver_laptimes(
+        laps, driver, f"Tiempos de vuelta de {driver} - {race_name}"
+    )
+    path = OUTPUT_DIR / f"laptimes_{driver}_{suffix}.png"
+    fig.savefig(path, dpi=150)
+    saved.append(path)
+
+    # Distribución de vueltas de los puntuables
+    fig = plot_laptime_distribution(
+        laps, race, f"Distribución de tiempos de vuelta - {race_name}"
+    )
+    path = OUTPUT_DIR / f"laptimes_distribution_{suffix}.png"
+    fig.savefig(path, dpi=150)
+    saved.append(path)
+
+    print()
+    for path in saved:
+        print(f"Guardado: {path}")
 
     if not args.no_show:
         plt.show()
