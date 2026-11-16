@@ -1,6 +1,7 @@
 """Gráficas a nivel de temporada."""
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
@@ -36,5 +37,63 @@ def plot_title_chances(table, title):
         Line2D([0], [0], color="black", linestyle="--", label="Puntos del líder"),
     ]
     ax.legend(handles=handles, loc="lower right")
+    fig.tight_layout()
+    return fig
+
+
+def plot_points_heatmap(matrix, labels, title):
+    """Mapa de calor de puntos por piloto y carrera, con el total a la derecha.
+
+    'matrix' y 'labels' vienen de season.get_points_matrix(). Los pilotos se
+    ordenan por puntos totales, de más a menos.
+    """
+    totals = matrix.sum(axis=1).sort_values(ascending=False)
+    matrix = matrix.loc[totals.index]
+
+    fig, (ax_main, ax_total) = plt.subplots(
+        1,
+        2,
+        figsize=(14, 9),
+        gridspec_kw={"width_ratios": [len(matrix.columns), 2]},
+    )
+
+    sns.heatmap(
+        matrix,
+        ax=ax_main,
+        cmap="Blues",
+        vmin=0,
+        annot=True,
+        fmt="g",
+        annot_kws={"size": 8},
+        cbar=False,
+        linewidths=0.5,
+        linecolor="white",
+        xticklabels=labels,
+        yticklabels=matrix.index,
+    )
+    ax_main.xaxis.tick_top()
+    ax_main.tick_params(axis="x", labelrotation=90)
+    ax_main.set_xlabel("")
+    ax_main.set_ylabel("")
+
+    sns.heatmap(
+        totals.to_frame("Total"),
+        ax=ax_total,
+        cmap="Blues",
+        vmin=0,
+        annot=True,
+        fmt="g",
+        annot_kws={"size": 8},
+        cbar=False,
+        linewidths=0.5,
+        linecolor="white",
+        xticklabels=["Total"],
+        yticklabels=False,
+    )
+    ax_total.xaxis.tick_top()
+    ax_total.set_xlabel("")
+    ax_total.set_ylabel("")
+
+    fig.suptitle(title)
     fig.tight_layout()
     return fig
