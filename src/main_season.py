@@ -2,7 +2,7 @@
 
 Ejemplo:
     py src/main_season.py --season 2025 --round 12
-    py src/main_season.py --season 2025 --round 21 --no-show
+    py src/main_season.py --season 2022 --round 22 --no-show
 """
 
 import argparse
@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 
 from f1analysis.season import (
     get_driver_standings,
+    get_points_matrix,
     max_points_remaining,
     who_can_win,
 )
-from f1analysis.season_plots import plot_title_chances
+from f1analysis.season_plots import plot_points_heatmap, plot_title_chances
 
 OUTPUT_DIR = Path("outputs")
 
@@ -35,7 +36,9 @@ def parse_args():
 def main():
     args = parse_args()
     season, round_ = args.season, args.round
+    suffix = f"{season}_r{round_}"
     OUTPUT_DIR.mkdir(exist_ok=True)
+    saved = []
 
     # --- Quién puede ganar aún el campeonato ---
     standings = get_driver_standings(season, round_)
@@ -49,9 +52,34 @@ def main():
     fig = plot_title_chances(
         table, f"¿Quién puede ganar el título? Temporada {season}, tras la ronda {round_}"
     )
-    path = OUTPUT_DIR / f"title_chances_{season}_r{round_}.png"
+    path = OUTPUT_DIR / f"title_chances_{suffix}.png"
     fig.savefig(path, dpi=150)
-    print(f"\nGuardado: {path}")
+    saved.append(path)
+
+    # --- Puntos por piloto y carrera ---
+    print("\nDescargando los puntos de cada carrera (tarda la primera vez)...")
+    matrix, labels = get_points_matrix(season, up_to_round=round_, verbose=True)
+
+    # Comprobación: los totales de la matriz deben coincidir con la clasificación
+    standings_points = table.set_index("driverCode")["points"]
+    diff = (matrix.sum(axis=1) - standings_points).dropna()
+    mismatches = diff[diff.abs() > 0.01]
+    if mismatches.empty:
+        print("Comprobación OK: los totales coinciden con la clasificación oficial.")
+    else:
+        print("Aviso: estos totales no coinciden con la clasificación oficial:")
+        print(mismatches)
+
+    fig = plot_points_heatmap(
+        matrix, labels, f"Puntos por piloto y carrera - Temporada {season}"
+    )
+    path = OUTPUT_DIR / f"points_heatmap_{suffix}.png"
+    fig.savefig(path, dpi=150)
+    saved.append(path)
+
+    print()
+    for path in saved:
+        print(f"Guardado: {path}")
 
     if args.no_show:
         plt.close("all")
