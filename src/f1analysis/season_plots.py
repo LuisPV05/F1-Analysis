@@ -1,9 +1,12 @@
 """Gráficas a nivel de temporada."""
 
 import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.graph_objects as go
 import seaborn as sns
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from plotly.subplots import make_subplots
 
 YES_COLOR = "#2ca02c"
 NO_COLOR = "#999999"
@@ -44,7 +47,7 @@ def plot_title_chances(table, title):
 def plot_points_heatmap(matrix, labels, title):
     """Mapa de calor de puntos por piloto y carrera, con el total a la derecha.
 
-    'matrix' y 'labels' vienen de season.get_points_matrix(). Los pilotos se
+    'matrix' y 'labels' vienen de season.get_season_data(). Los pilotos se
     ordenan por puntos totales, de más a menos.
     """
     totals = matrix.sum(axis=1).sort_values(ascending=False)
@@ -96,4 +99,77 @@ def plot_points_heatmap(matrix, labels, title):
 
     fig.suptitle(title)
     fig.tight_layout()
+    return fig
+
+
+def plot_season_summary(points, positions, labels, title):
+    """Resumen interactivo de la temporada (figura de plotly).
+
+    Mapa de calor de puntos por piloto y carrera, más una columna con el
+    total. Al pasar el ratón por una celda se ve también la posición de
+    llegada. 'points', 'positions' y 'labels' vienen de
+    season.get_season_data().
+    """
+    # El de menos puntos primero: plotly dibuja el primer elemento abajo
+    totals = points.sum(axis=1).sort_values(ascending=True)
+    points = points.loc[totals.index]
+    positions = positions.reindex(index=points.index, columns=points.columns)
+
+    hover_positions = positions.map(
+        lambda value: "N/A" if pd.isna(value) else str(int(value))
+    )
+    # Con el número de ronda delante, para que no se mezclen carreras con
+    # el mismo nombre en una temporada
+    race_labels = [f"{rnd}. {label}" for rnd, label in zip(points.columns, labels)]
+    total_values = totals.to_numpy()
+
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        column_widths=[0.85, 0.15],
+        subplot_titles=(title, "Puntos totales"),
+    )
+    fig.update_layout(width=1000, height=800)
+
+    fig.add_trace(
+        go.Heatmap(
+            x=race_labels,
+            y=points.index,
+            z=points.values,
+            text=points.values,
+            texttemplate="%{text}",
+            textfont={"size": 12},
+            customdata=hover_positions.values,
+            hovertemplate=(
+                "Piloto: %{y}<br>"
+                "Carrera: %{x}<br>"
+                "Puntos: %{z}<br>"
+                "Posición: %{customdata}<extra></extra>"
+            ),
+            colorscale="YlGnBu",
+            showscale=False,
+            zmin=0,
+            zmax=points.to_numpy().max(),
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Heatmap(
+            x=["Total"] * len(total_values),
+            y=points.index,
+            z=total_values,
+            text=total_values,
+            texttemplate="%{text}",
+            textfont={"size": 12},
+            hovertemplate="Piloto: %{y}<br>Puntos: %{z}<extra></extra>",
+            colorscale="YlGnBu",
+            showscale=False,
+            zmin=0,
+            zmax=total_values.max(),
+        ),
+        row=1,
+        col=2,
+    )
+    fig.update_xaxes(tickangle=-60, row=1, col=1)
     return fig
