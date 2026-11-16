@@ -80,18 +80,23 @@ def who_can_win(standings, max_points):
     return table.sort_values("position")
 
 
-def _round_points(ergast, season, round_, has_sprint):
-    """Puntos de cada piloto en una ronda (carrera más sprint, si lo hubo).
+def _round_results(ergast, season, round_, has_sprint):
+    """Puntos y posición de cada piloto en una ronda.
 
-    Devuelve una Series indexada por driverCode, o None si la carrera
-    todavía no tiene resultados.
+    Devuelve un DataFrame indexado por driverCode con las columnas:
+      - points: puntos de la carrera más los del sprint, si lo hubo.
+      - position: posición de llegada en la carrera.
+    Devuelve None si la carrera todavía no tiene resultados.
     """
     race = _with_retry(
         lambda: ergast.get_race_results(season=season, round=round_)
     )
     if not race.content or race.content[0].empty:
         return None
-    points = race.content[0].set_index("driverCode")["points"].astype(float)
+
+    table = race.content[0].set_index("driverCode")[["points", "position"]].copy()
+    table["points"] = table["points"].astype(float)
+    table["position"] = pd.to_numeric(table["position"], errors="coerce")
 
     if has_sprint:
         sprint = _with_retry(
@@ -101,18 +106,20 @@ def _round_points(ergast, season, round_, has_sprint):
             sprint_points = (
                 sprint.content[0].set_index("driverCode")["points"].astype(float)
             )
-            points = points.add(sprint_points, fill_value=0)
-    return points
+            total = table["points"].add(sprint_points, fill_value=0)
+            table = table.reindex(total.index)
+            table["points"] = total
+    return table
 
 
-def get_points_matrix(season, up_to_round=None, verbose=False):
-    """Puntos de cada piloto en cada ronda de la temporada.
+def get_season_data(season, up_to_round=None, verbose=False):
+    """Puntos y posiciones de cada piloto en cada ronda de la temporada.
 
-    Devuelve (matrix, labels):
-      - matrix: DataFrame con una fila por piloto (driverCode) y una columna
+    Devuelve (points, positions, labels):
+      - points: DataFrame con una fila por piloto (driverCode) y una columna
         por ronda (número de ronda). 0 si el piloto no puntuó o no corrió.
-      - labels: nombres cortos de las carreras, en el mismo orden que las
-        columnas.
+      - positions: igual, con la posición de llegada (NaN si no corrió).
+      - labels: nombres cortos de las carreras, en el orden de las columnas.
     Se detiene en la primera ronda sin resultados.
     """
     schedule = _get_schedule(season)
@@ -131,19 +138,22 @@ def get_points_matrix(season, up_to_round=None, verbose=False):
     last_round = max(rounds) if up_to_round is None else min(up_to_round, max(rounds))
 
     ergast = Ergast()
-    columns = {}
+    points_cols = {}
+    position_cols = {}
     labels = []
     for round_ in range(1, last_round + 1):
         if verbose:
             print(f"  Descargando ronda {round_}/{last_round}...")
-        points = _round_points(ergast, season, round_, round_ in sprint_rounds)
-        if points is None:
+        results = _round_results(ergast, season, round_, round_ in sprint_rounds)
+        if results is None:
             break  # carrera aún no disputada
-        columns[round_] = points
+        points_cols[round_] = results["points"]
+        position_cols[round_] = results["position"]
         labels.append(names[round_])
 
-    if not columns:
+    if not points_cols:
         raise ValueError(f"No hay resultados para la temporada {season}.")
 
-    matrix = pd.DataFrame(columns).fillna(0)
-    return matrix, labels
+    points = pd.DataFrame(points_cols).fillna(0)
+    positions = pd.DataFrame(position_cols).reindex(points.index)
+    return points, positions, labels
