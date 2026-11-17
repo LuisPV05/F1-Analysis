@@ -1,18 +1,16 @@
 # F1-Analysis
 
-Análisis de datos de Fórmula 1 con Python: resultados de carrera, clasificación, tiempos por vuelta, ritmo de carrera, cambios de posición y estrategias, usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
+Análisis de datos de Fórmula 1 con Python, a nivel de carrera (resultados, clasificación, tiempos por vuelta, ritmo, cambios de posición y estrategias) y de temporada (quién puede ganar el campeonato, puntos por piloto y carrera), usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
 
-Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se reorganizó en un paquete reutilizable con una herramienta de línea de comandos.
+Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se organizó en un paquete reutilizable con dos herramientas de línea de comandos.
 
 ## Gráficas
 
-Ejemplo con el GP de Francia 2021 (`--season 2021 --round 7`).
+### Análisis de carrera
 
-### Clasificación
+Ejemplo con el GP de Francia 2021 (`py src/main.py --season 2021 --round 7`).
 
 ![Diferencia con la pole](outputs/qualifying_delta_2021_r7.png)
-
-### Ritmo y tiempos de vuelta
 
 ![Ritmo de carrera](outputs/race_pace_2021_r7.png)
 
@@ -20,21 +18,30 @@ Ejemplo con el GP de Francia 2021 (`--season 2021 --round 7`).
 
 ![Distribución de tiempos de vuelta](outputs/laptimes_distribution_2021_r7.png)
 
-### Estrategia y resultados
-
 ![Cambios de posición](outputs/position_changes_2021_r7.png)
 
 ![Ritmo por escudería](outputs/team_pace_2021_r7.png)
 
 ![Estrategias por stints](outputs/strategy_2021_r7.png)
 
+### Análisis de temporada
+
+Ejemplo con la temporada 2022 completa (`py src/main_season.py --season 2022 --round 22`).
+
+![Quién puede ganar el título](outputs/title_chances_2022_r22.png)
+
+![Puntos por piloto y carrera](outputs/points_heatmap_2022_r22.png)
+
+También se genera un [resumen interactivo en HTML](outputs/season_summary_2022_r22.html): al pasar el ratón por cada celda se ve el piloto, la carrera, los puntos y la posición de llegada. GitHub no ejecuta archivos HTML, así que hay que descargarlo y abrirlo en el navegador.
+
 ## Qué hace
 
 - Descarga resultados de clasificación y de carrera de cualquier temporada y ronda.
-- Obtiene los tiempos de todas las vueltas y las paradas en boxes (con paginación de la API).
-- Deduce los stints de cada piloto a partir de las paradas.
+- Obtiene los tiempos de todas las vueltas y las paradas en boxes, y deduce los stints de cada piloto.
 - Calcula la vuelta rápida y la mejor vuelta de cada piloto.
-- Genera siete gráficas con matplotlib y seaborn, con colores de escudería, y las guarda en `outputs/` con la temporada y la ronda en el nombre.
+- Calcula qué pilotos pueden ganar aún el campeonato, contando carreras y sprints restantes.
+- Construye la matriz de puntos por piloto y ronda (carrera más sprint) y comprueba que coincide con la clasificación oficial.
+- Genera gráficas estáticas (PNG) y un resumen interactivo (HTML), y las guarda en `outputs/` con la temporada y la ronda en el nombre.
 
 ## Datos y limitaciones
 
@@ -46,6 +53,7 @@ Las contrapartidas son:
 
 - **No hay telemetría** (velocidad, freno, acelerador, posición en pista).
 - **No hay compuesto de neumático** (blando, medio, duro). Como sustituto, las gráficas se colorean por **stint**, deducido de las paradas en boxes.
+- **Límite de peticiones**: Jolpica responde `Too Many Requests` si se hacen demasiadas seguidas. El análisis de temporada reintenta con esperas crecientes, y FastF1 guarda lo ya descargado en caché, así que repetir el comando continúa donde se quedó.
 
 ## Instalación
 
@@ -61,13 +69,11 @@ py -m pip install -r requirements.txt
 
 ## Uso
 
-Desde la raíz del repo:
+### Análisis de una carrera
 
 ```powershell
 py src/main.py --season 2021 --round 7
 ```
-
-Opciones:
 
 | Opción | Descripción |
 |---|---|
@@ -77,13 +83,21 @@ Opciones:
 | `--driver` | Código del piloto para la dispersión de vueltas, p. ej. `HAM` (por defecto, el ganador) |
 | `--no-show` | Guarda las gráficas sin abrirlas en pantalla |
 
-Ejemplo sin abrir ventanas:
+Muestra por consola la vuelta rápida y la mejor vuelta de cada piloto, y guarda siete gráficas en `outputs/`.
+
+### Análisis de una temporada
 
 ```powershell
-py src/main.py --season 2023 --round 1 --top 5 --driver ALO --no-show
+py src/main_season.py --season 2022 --round 22
 ```
 
-El programa muestra por consola la vuelta rápida y la mejor vuelta de cada piloto, y guarda siete gráficas en `outputs/`.
+| Opción | Descripción |
+|---|---|
+| `--season` | Año de la temporada (obligatorio) |
+| `--round` | Ronda hasta la que se analiza (obligatorio) |
+| `--no-show` | Guarda los archivos sin abrir las gráficas ni el HTML |
+
+Muestra por consola la clasificación con el máximo teórico de puntos de cada piloto, y guarda dos PNG y un HTML interactivo en `outputs/`. Para ver pilotos descartados del título, usa una ronda tardía de una temporada en curso, por ejemplo `--season 2025 --round 21`.
 
 ## Estructura
 
@@ -94,19 +108,32 @@ F1-Analysis/
 ├── .gitignore
 ├── outputs/                      # gráficas generadas
 └── src/
-    ├── main.py                   # herramienta de línea de comandos
+    ├── main.py                   # línea de comandos: análisis de una carrera
+    ├── main_season.py            # línea de comandos: análisis de una temporada
     ├── f1analysis/               # paquete con la lógica
-    │   ├── data.py               # descarga y limpieza de datos (Jolpica)
-    │   ├── analysis.py           # cálculos: delta con la pole, vuelta rápida...
+    │   ├── data.py               # datos de carrera desde Jolpica
+    │   ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
     │   ├── styling.py            # colores de escudería y estilo por piloto
-    │   └── plots.py              # gráficas con matplotlib y seaborn
+    │   ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
+    │   ├── season.py             # clasificaciones, puntos y opciones al título
+    │   └── season_plots.py       # gráficas de temporada (seaborn y plotly)
     ├── 01_basics.py              # ejemplo: sesiones y eventos
     ├── 02_schedule.py            # ejemplo: calendario de temporada
     ├── 03_results_ergast.py      # ejemplo: resultados con Jolpica
     └── 04_laps_ergast.py         # ejemplo: exploración de tiempos por vuelta
 ```
 
-Los scripts numerados son los primeros pasos de aprendizaje y se conservan como ejemplos. La funcionalidad actual está en `src/main.py` y en el paquete `src/f1analysis/`.
+Los scripts numerados son los primeros pasos de aprendizaje y se conservan como ejemplos. La funcionalidad actual está en `src/main.py`, `src/main_season.py` y el paquete `src/f1analysis/`.
+
+## Flujo de trabajo
+
+Cada funcionalidad sigue el mismo ciclo en GitHub:
+
+1. Se abre un **issue** que describe lo que hay que hacer.
+2. Se trabaja en una **rama** propia (`feature/N-nombre`, o `docs/N-nombre` para documentación).
+3. Cada **commit** empieza por el número del issue: `#N feat: ...`.
+4. Se abre un **pull request** cuya descripción incluye `Closes #N`.
+5. Al hacer el merge, el issue se cierra solo y la rama se borra.
 
 ## Tecnologías
 
@@ -115,18 +142,19 @@ Los scripts numerados son los primeros pasos de aprendizaje y se conservan como 
 - pandas
 - matplotlib
 - seaborn
+- plotly
 
 ## Próximos pasos
 
-- [x] Reorganizar el código en módulos reutilizables (datos, análisis, gráficas).
+- [x] Reorganizar el código en módulos reutilizables.
 - [x] Elegir temporada y ronda desde la línea de comandos.
 - [x] Estilo por piloto con colores de escudería y leyenda ordenada.
 - [x] Dispersión y distribución de tiempos de vuelta.
 - [x] Estrategia y resultados: cambios de posición, ritmo por equipos y estrategia por stints.
-- [ ] Clasificaciones de pilotos y constructores durante la temporada.
+- [x] Temporada: quién puede ganar el campeonato, mapa de calor de puntos y resumen interactivo.
 - [ ] Mover los scripts de ejemplo a una carpeta `examples/`.
 - [ ] Comparativas entre temporadas.
-- [ ] Mapa del circuito y telemetría, si se dispone de acceso a los datos (requieren cuenta F1TV).
+- [ ] Telemetría y mapa del circuito, si se dispone de acceso a los datos (requieren cuenta F1TV).
 
 ## Autor
 
