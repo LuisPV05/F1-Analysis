@@ -1,8 +1,8 @@
 # F1-Analysis
 
-Análisis de datos de Fórmula 1 con Python, a nivel de carrera (resultados, clasificación, tiempos por vuelta, ritmo, cambios de posición y estrategias), de temporada (quién puede ganar el campeonato, puntos por piloto y carrera) y entre temporadas (campeones año a año), usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
+Análisis de datos de Fórmula 1 con Python, a nivel de carrera (resultados, clasificación, tiempos por vuelta, ritmo, cambios de posición y estrategias), de temporada (quién puede ganar el campeonato, puntos por piloto y carrera) y entre temporadas (campeones y comparación de pilotos año a año), usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
 
-Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se organizó en un paquete reutilizable con tres herramientas de línea de comandos.
+Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se organizó en un paquete reutilizable con cuatro herramientas de línea de comandos.
 
 ## Gráficas
 
@@ -34,11 +34,15 @@ Ejemplo con la temporada 2022 completa (`py src/main_season.py --season 2022 --r
 
 También se genera un [resumen interactivo en HTML](outputs/season_summary_2022_r22.html): al pasar el ratón por cada celda se ve el piloto, la carrera, los puntos y la posición de llegada. GitHub no ejecuta archivos HTML, así que hay que descargarlo y abrirlo en el navegador.
 
-### Comparativa entre temporadas
+### Comparativas entre temporadas
 
-Ejemplo con los campeones de 2010 a 2025 (`py src/main_history.py --start 2010 --end 2025`).
+Campeones de 2010 a 2025 (`py src/main_history.py --start 2010 --end 2025`).
 
 ![Campeones de 2010 a 2025](outputs/champions_2010_2025.png)
+
+Hamilton frente a Verstappen, de 2010 a 2025 (`py src/main_drivers.py --start 2010 --end 2025`). Las estrellas marcan los años en que cada piloto ganó el título.
+
+![Hamilton frente a Verstappen](outputs/drivers_hamilton_vs_max_verstappen_2010_2025.png)
 
 ## Qué hace
 
@@ -48,6 +52,7 @@ Ejemplo con los campeones de 2010 a 2025 (`py src/main_history.py --start 2010 -
 - Calcula qué pilotos pueden ganar aún el campeonato, contando carreras y sprints restantes.
 - Construye la matriz de puntos por piloto y ronda (carrera más sprint) y comprueba que coincide con la clasificación oficial.
 - Compara el campeón y el subcampeón de cada temporada en un rango de años.
+- Compara los puntos, las victorias y la posición final de los pilotos que elijas a lo largo de varias temporadas.
 - Genera gráficas estáticas (PNG) y un resumen interactivo (HTML), y las guarda en `outputs/` con la temporada y la ronda en el nombre.
 
 ## Datos y limitaciones
@@ -60,7 +65,7 @@ Las contrapartidas son:
 
 - **No hay telemetría** (velocidad, freno, acelerador, posición en pista).
 - **No hay compuesto de neumático** (blando, medio, duro). Como sustituto, las gráficas se colorean por **stint**, deducido de las paradas en boxes.
-- **Límite de peticiones**: Jolpica responde `Too Many Requests` si se hacen demasiadas seguidas. Los análisis de temporada y de campeones reintentan con esperas crecientes, y FastF1 guarda lo ya descargado en caché, así que repetir el comando continúa donde se quedó.
+- **Límite de peticiones**: Jolpica responde `Too Many Requests` si se hacen demasiadas seguidas. Los análisis de temporada y entre temporadas reintentan con esperas crecientes, y FastF1 guarda lo ya descargado en caché, así que repetir el comando continúa donde se quedó.
 - **Épocas distintas**: el sistema de puntos ha cambiado a lo largo de la historia, por lo que comparar puntos de años muy distantes no es directo. El cálculo de puntos máximos restantes usa el sistema actual.
 
 ## Instalación
@@ -121,6 +126,22 @@ py src/main_history.py --start 2010 --end 2025
 
 Muestra por consola una tabla con el campeón, su escudería, sus puntos y victorias, y el margen sobre el subcampeón, y guarda una gráfica en `outputs/`. Se recomienda no empezar antes del año 2000: los sistemas de puntos eran muy distintos y las escuderías antiguas no tienen color asignado.
 
+### Comparativa de pilotos
+
+```powershell
+py src/main_drivers.py --start 2010 --end 2025
+py src/main_drivers.py --start 2005 --end 2018 --drivers alonso vettel
+```
+
+| Opción | Descripción |
+|---|---|
+| `--start` | Primera temporada (obligatorio) |
+| `--end` | Última temporada (obligatorio) |
+| `--drivers` | Dos o más pilotos, por identificador de Jolpica, código o apellido (por defecto `hamilton max_verstappen`) |
+| `--no-show` | Guarda la gráfica sin abrirla en pantalla |
+
+Muestra por consola un resumen (temporadas, títulos, victorias y puntos) y los puntos de cada piloto por año, y guarda una gráfica con puntos, victorias y posición final. Cuando el apellido pueda confundirse con otro piloto, conviene usar el identificador de Jolpica (`max_verstappen` en lugar de `verstappen`).
+
 ### Ejemplos de aprendizaje
 
 La carpeta `examples/` contiene los primeros pasos del proyecto, scripts sencillos e independientes del paquete. Se ejecutan desde la raíz del repo:
@@ -146,6 +167,7 @@ F1-Analysis/
     ├── main.py                   # línea de comandos: análisis de una carrera
     ├── main_season.py            # línea de comandos: análisis de una temporada
     ├── main_history.py           # línea de comandos: comparativa de campeones
+    ├── main_drivers.py           # línea de comandos: comparativa de pilotos
     └── f1analysis/               # paquete con la lógica
         ├── data.py               # datos de carrera desde Jolpica
         ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
@@ -153,8 +175,8 @@ F1-Analysis/
         ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
         ├── season.py             # clasificaciones, puntos y opciones al título
         ├── season_plots.py       # gráficas de temporada (seaborn y plotly)
-        ├── history.py            # campeones de cada temporada
-        └── history_plots.py      # gráfica de campeones entre temporadas
+        ├── history.py            # campeones y comparación de pilotos por temporada
+        └── history_plots.py      # gráficas entre temporadas
 ```
 
 ## Flujo de trabajo
@@ -186,7 +208,7 @@ Cada funcionalidad sigue el mismo ciclo en GitHub:
 - [x] Temporada: quién puede ganar el campeonato, mapa de calor de puntos y resumen interactivo.
 - [x] Mover los scripts de ejemplo a una carpeta `examples/`.
 - [x] Comparativa de campeones entre temporadas.
-- [ ] Comparar dos pilotos concretos a lo largo de varias temporadas.
+- [x] Comparar pilotos a lo largo de varias temporadas.
 - [ ] Telemetría y mapa del circuito, si se dispone de acceso a los datos (requieren cuenta F1TV).
 
 ## Autor
