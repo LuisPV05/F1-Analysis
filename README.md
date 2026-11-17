@@ -99,6 +99,14 @@ py src/main_season.py --season 2022 --round 22
 
 Muestra por consola la clasificación con el máximo teórico de puntos de cada piloto, y guarda dos PNG y un HTML interactivo en `outputs/`. Para ver pilotos descartados del título, usa una ronda tardía de una temporada en curso, por ejemplo `--season 2025 --round 21`.
 
+### Ejemplos de aprendizaje
+
+La carpeta `examples/` contiene los primeros pasos del proyecto, scripts sencillos e independientes del paquete. Se ejecutan desde la raíz del repo:
+
+```powershell
+py examples/01_basics.py
+```
+
 ## Estructura
 
 ```
@@ -106,31 +114,30 @@ F1-Analysis/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
+├── examples/                     # primeros pasos de aprendizaje
+│   ├── 01_basics.py              # sesiones y eventos
+│   ├── 02_schedule.py            # calendario de temporada
+│   ├── 03_results_ergast.py      # resultados con Jolpica
+│   └── 04_laps_ergast.py         # exploración de tiempos por vuelta
 ├── outputs/                      # gráficas generadas
 └── src/
     ├── main.py                   # línea de comandos: análisis de una carrera
     ├── main_season.py            # línea de comandos: análisis de una temporada
-    ├── f1analysis/               # paquete con la lógica
-    │   ├── data.py               # datos de carrera desde Jolpica
-    │   ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
-    │   ├── styling.py            # colores de escudería y estilo por piloto
-    │   ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
-    │   ├── season.py             # clasificaciones, puntos y opciones al título
-    │   └── season_plots.py       # gráficas de temporada (seaborn y plotly)
-    ├── 01_basics.py              # ejemplo: sesiones y eventos
-    ├── 02_schedule.py            # ejemplo: calendario de temporada
-    ├── 03_results_ergast.py      # ejemplo: resultados con Jolpica
-    └── 04_laps_ergast.py         # ejemplo: exploración de tiempos por vuelta
+    └── f1analysis/               # paquete con la lógica
+        ├── data.py               # datos de carrera desde Jolpica
+        ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
+        ├── styling.py            # colores de escudería y estilo por piloto
+        ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
+        ├── season.py             # clasificaciones, puntos y opciones al título
+        └── season_plots.py       # gráficas de temporada (seaborn y plotly)
 ```
-
-Los scripts numerados son los primeros pasos de aprendizaje y se conservan como ejemplos. La funcionalidad actual está en `src/main.py`, `src/main_season.py` y el paquete `src/f1analysis/`.
 
 ## Flujo de trabajo
 
 Cada funcionalidad sigue el mismo ciclo en GitHub:
 
 1. Se abre un **issue** que describe lo que hay que hacer.
-2. Se trabaja en una **rama** propia (`feature/N-nombre`, o `docs/N-nombre` para documentación).
+2. Se trabaja en una **rama** propia (`feature/N-nombre`, `docs/N-nombre` o `refactor/N-nombre`).
 3. Cada **commit** empieza por el número del issue: `#N feat: ...`.
 4. Se abre un **pull request** cuya descripción incluye `Closes #N`.
 5. Al hacer el merge, el issue se cierra solo y la rama se borra.
@@ -152,7 +159,7 @@ Cada funcionalidad sigue el mismo ciclo en GitHub:
 - [x] Dispersión y distribución de tiempos de vuelta.
 - [x] Estrategia y resultados: cambios de posición, ritmo por equipos y estrategia por stints.
 - [x] Temporada: quién puede ganar el campeonato, mapa de calor de puntos y resumen interactivo.
-- [ ] Mover los scripts de ejemplo a una carpeta `examples/`.
+- [x] Mover los scripts de ejemplo a una carpeta `examples/`.
 - [ ] Comparativas entre temporadas.
 - [ ] Telemetría y mapa del circuito, si se dispone de acceso a los datos (requieren cuenta F1TV).
 
