@@ -3,6 +3,8 @@
 import pandas as pd
 from fastf1.ergast import Ergast
 
+from .cache import cached_dataframe
+
 PAGE_SIZE = 100  # filas por petición a la API
 
 
@@ -53,14 +55,22 @@ def _fetch_all(method, season, round_):
     return pd.concat(frames, ignore_index=True)
 
 
-def get_race_results(season, round_):
-    """Resultado de la carrera."""
+def _download_race_results(season, round_):
     response = Ergast().get_race_results(season=season, round=round_)
     return _first_table(response, season, round_)
 
 
-def get_qualifying(season, round_):
-    """Clasificación con Q1, Q2, Q3 y mejor tiempo ('best') en segundos."""
+def get_race_results(season, round_):
+    """Resultado de la carrera."""
+    return cached_dataframe(
+        "race_results",
+        lambda: _download_race_results(season, round_),
+        season=season,
+        round_=round_,
+    )
+
+
+def _download_qualifying(season, round_):
     response = Ergast().get_qualifying_results(season=season, round=round_)
     df = _first_table(response, season, round_)
     for col in ["Q1", "Q2", "Q3"]:
@@ -69,16 +79,45 @@ def get_qualifying(season, round_):
     return df
 
 
-def get_pit_stops(season, round_):
-    """Paradas en boxes. Columnas útiles: driverId, stop, lap.
+def get_qualifying(season, round_):
+    """Clasificación con Q1, Q2, Q3 y mejor tiempo ('best') en segundos."""
+    return cached_dataframe(
+        "qualifying",
+        lambda: _download_qualifying(season, round_),
+        season=season,
+        round_=round_,
+    )
 
-    Si la API no tiene paradas para esa carrera, devuelve un DataFrame vacío.
-    """
+
+def _download_pit_stops(season, round_):
     pit = _fetch_all(Ergast().get_pit_stops, season, round_)
     if pit.empty:
         return pd.DataFrame(columns=["driverId", "stop", "lap"])
     pit["lap"] = pd.to_numeric(pit["lap"])
     return pit
+
+
+def get_pit_stops(season, round_):
+    """Paradas en boxes. Columnas útiles: driverId, stop, lap.
+
+    Si la API no tiene paradas para esa carrera, devuelve un DataFrame vacío.
+    """
+    return cached_dataframe(
+        "pit_stops",
+        lambda: _download_pit_stops(season, round_),
+        season=season,
+        round_=round_,
+    )
+
+
+def _get_lap_times(season, round_):
+    """Tiempos por vuelta tal como los devuelve la API (todas las páginas)."""
+    return cached_dataframe(
+        "lap_times",
+        lambda: _fetch_all(Ergast().get_lap_times, season, round_),
+        season=season,
+        round_=round_,
+    )
 
 
 def add_stints(laps, pit_stops):
@@ -103,7 +142,7 @@ def get_laps(season, round_):
     Columnas: lap, driverId, position, time, seconds, driverCode,
     constructorId, constructorName, stint.
     """
-    laps = _fetch_all(Ergast().get_lap_times, season, round_)
+    laps = _get_lap_times(season, round_)
     if laps.empty:
         raise ValueError(
             f"No hay vueltas para la temporada {season}, ronda {round_}."
