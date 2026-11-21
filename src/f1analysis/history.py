@@ -3,6 +3,7 @@
 import pandas as pd
 from fastf1.ergast import Ergast
 
+from .cache import cached_dataframe
 from .season import _with_retry
 
 
@@ -13,11 +14,7 @@ def _first_item(value):
     return value
 
 
-def _season_standings(ergast, season):
-    """Clasificación final de pilotos de una temporada, ordenada por posición.
-
-    Devuelve None si la temporada no tiene datos.
-    """
+def _download_season_standings(ergast, season):
     response = _with_retry(
         lambda: ergast.get_driver_standings(season=season)
     )
@@ -28,6 +25,18 @@ def _season_standings(ergast, season):
     for col in ["position", "points", "wins"]:
         standings[col] = pd.to_numeric(standings[col], errors="coerce")
     return standings.sort_values("position")
+
+
+def _season_standings(ergast, season):
+    """Clasificación final de pilotos de una temporada, ordenada por posición.
+
+    Devuelve None si la temporada no tiene datos.
+    """
+    return cached_dataframe(
+        "final_standings",
+        lambda: _download_season_standings(ergast, season),
+        season=season,
+    )
 
 
 def _find_driver(standings, query):
