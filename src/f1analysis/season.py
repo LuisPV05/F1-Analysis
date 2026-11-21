@@ -7,6 +7,8 @@ import pandas as pd
 from fastf1.ergast import Ergast
 from fastf1.exceptions import ErgastInvalidRequestError
 
+from .cache import cached_dataframe
+
 # Sistema de puntos actual: victoria en carrera y victoria en sprint.
 RACE_WIN_POINTS = 25
 SPRINT_WIN_POINTS = 8
@@ -37,8 +39,7 @@ def _get_schedule(season):
     )
 
 
-def get_driver_standings(season, round_):
-    """Clasificación de pilotos tras la ronda indicada."""
+def _download_standings(season, round_):
     response = _with_retry(
         lambda: Ergast().get_driver_standings(season=season, round=round_)
     )
@@ -50,6 +51,16 @@ def get_driver_standings(season, round_):
     standings["position"] = pd.to_numeric(standings["position"])
     standings["points"] = pd.to_numeric(standings["points"])
     return standings
+
+
+def get_driver_standings(season, round_):
+    """Clasificación de pilotos tras la ronda indicada."""
+    return cached_dataframe(
+        "driver_standings",
+        lambda: _download_standings(season, round_),
+        season=season,
+        round_=round_,
+    )
 
 
 def max_points_remaining(season, round_):
@@ -80,8 +91,8 @@ def who_can_win(standings, max_points):
     return table.sort_values("position")
 
 
-def _round_results(ergast, season, round_, has_sprint):
-    """Puntos y posición de cada piloto en una ronda.
+def _download_round_results(ergast, season, round_, has_sprint):
+    """Puntos y posición de cada piloto en una ronda, sin pasar por la caché.
 
     Devuelve un DataFrame indexado por driverCode con las columnas:
       - points: puntos de la carrera más los del sprint, si lo hubo.
@@ -110,6 +121,17 @@ def _round_results(ergast, season, round_, has_sprint):
             table = table.reindex(total.index)
             table["points"] = total
     return table
+
+
+def _round_results(ergast, season, round_, has_sprint):
+    """Igual que _download_round_results, pero usando la caché en disco."""
+    return cached_dataframe(
+        "round_results",
+        lambda: _download_round_results(ergast, season, round_, has_sprint),
+        season=season,
+        round_=round_,
+        sprint=has_sprint,
+    )
 
 
 def get_season_data(season, up_to_round=None, verbose=False):
