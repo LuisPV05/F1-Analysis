@@ -1,8 +1,10 @@
 # F1-Analysis
 
+[![Tests](https://github.com/LuisPV05/F1-Analysis/actions/workflows/tests.yml/badge.svg)](https://github.com/LuisPV05/F1-Analysis/actions/workflows/tests.yml)
+
 Análisis de datos de Fórmula 1 con Python, a nivel de carrera (resultados, clasificación, tiempos por vuelta, ritmo, cambios de posición y estrategias), de temporada (quién puede ganar el campeonato, puntos por piloto y carrera) y entre temporadas (campeones y comparación de pilotos año a año), usando [FastF1](https://docs.fastf1.dev/) y la API [Jolpica](https://github.com/jolpica/jolpica-f1) (compatible con Ergast).
 
-Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se organizó en un paquete reutilizable con cuatro herramientas de línea de comandos.
+Proyecto personal de aprendizaje en análisis de datos. Se construyó paso a paso a partir de la documentación de FastF1 (*Getting Started* y *Examples Gallery*), adaptando los ejemplos a datos abiertos, y se organizó en un paquete reutilizable con cuatro herramientas de línea de comandos, caché en disco, tests automáticos e integración continua.
 
 ## Gráficas
 
@@ -53,6 +55,7 @@ Hamilton frente a Verstappen, de 2010 a 2025 (`py src/main_drivers.py --start 20
 - Construye la matriz de puntos por piloto y ronda (carrera más sprint) y comprueba que coincide con la clasificación oficial.
 - Compara el campeón y el subcampeón de cada temporada en un rango de años.
 - Compara los puntos, las victorias y la posición final de los pilotos que elijas a lo largo de varias temporadas.
+- Guarda en disco los datos ya descargados, para repetir un análisis al instante y sin conexión.
 - Genera gráficas estáticas (PNG) y un resumen interactivo (HTML), y las guarda en `outputs/` con la temporada y la ronda en el nombre.
 
 ## Datos y limitaciones
@@ -65,8 +68,19 @@ Las contrapartidas son:
 
 - **No hay telemetría** (velocidad, freno, acelerador, posición en pista).
 - **No hay compuesto de neumático** (blando, medio, duro). Como sustituto, las gráficas se colorean por **stint**, deducido de las paradas en boxes.
-- **Límite de peticiones**: Jolpica responde `Too Many Requests` si se hacen demasiadas seguidas. Los análisis de temporada y entre temporadas reintentan con esperas crecientes, y FastF1 guarda lo ya descargado en caché, así que repetir el comando continúa donde se quedó.
+- **Límite de peticiones**: Jolpica responde `Too Many Requests` si se hacen demasiadas seguidas. Los análisis de temporada y entre temporadas reintentan con esperas crecientes, y la caché en disco evita repetir lo ya descargado, así que volver a lanzar un comando continúa donde se quedó.
 - **Épocas distintas**: el sistema de puntos ha cambiado a lo largo de la historia, por lo que comparar puntos de años muy distantes no es directo. El cálculo de puntos máximos restantes usa el sistema actual.
+
+## Caché en disco
+
+Los datos procesados de cada carrera, temporada y clasificación se guardan en la carpeta `.cache/` (ignorada por git):
+
+- Las **temporadas terminadas** se guardan para siempre, porque no cambian.
+- Los datos del **año en curso** caducan a las 12 horas, porque pueden aparecer carreras nuevas.
+- Para **desactivarla** en una ejecución, define la variable de entorno `F1ANALYSIS_NO_CACHE=1` (en PowerShell, `$env:F1ANALYSIS_NO_CACHE=1`).
+- Para **vaciarla**, borra la carpeta `.cache/`.
+
+Los archivos usan pickle, por lo que es una caché estrictamente local: no cargues una procedente de una fuente en la que no confíes.
 
 ## Instalación
 
@@ -150,33 +164,61 @@ La carpeta `examples/` contiene los primeros pasos del proyecto, scripts sencill
 py examples/01_basics.py
 ```
 
+## Desarrollo
+
+Para trabajar en el proyecto se instalan también las dependencias de desarrollo y se ejecutan los tests:
+
+```powershell
+py -m pip install -r requirements-dev.txt
+py -m pytest -v
+```
+
+Los tests (carpeta `tests/`) cubren las funciones que no dependen de la red: conversión de tiempos, stints, cálculos de carrera, estilos por piloto, búsqueda de pilotos, opciones al título, reintentos y caché en disco. Usan datos inventados y una carpeta temporal, así que no hacen peticiones a Jolpica ni tocan `.cache/`.
+
+### Integración continua
+
+El workflow de GitHub Actions `.github/workflows/tests.yml` ejecuta los tests en cada pull request y en cada push a `main`, con Python 3.10 (el mínimo que exige FastF1) y 3.14. El estado aparece en la insignia de arriba y en los checks de cada PR.
+
 ## Estructura
 
 ```
 F1-Analysis/
-├── README.md
-├── requirements.txt
-├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── tests.yml             # integración continua con pytest
 ├── examples/                     # primeros pasos de aprendizaje
 │   ├── 01_basics.py              # sesiones y eventos
 │   ├── 02_schedule.py            # calendario de temporada
 │   ├── 03_results_ergast.py      # resultados con Jolpica
 │   └── 04_laps_ergast.py         # exploración de tiempos por vuelta
 ├── outputs/                      # gráficas generadas
-└── src/
-    ├── main.py                   # línea de comandos: análisis de una carrera
-    ├── main_season.py            # línea de comandos: análisis de una temporada
-    ├── main_history.py           # línea de comandos: comparativa de campeones
-    ├── main_drivers.py           # línea de comandos: comparativa de pilotos
-    └── f1analysis/               # paquete con la lógica
-        ├── data.py               # datos de carrera desde Jolpica
-        ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
-        ├── styling.py            # colores de escudería y estilo por piloto
-        ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
-        ├── season.py             # clasificaciones, puntos y opciones al título
-        ├── season_plots.py       # gráficas de temporada (seaborn y plotly)
-        ├── history.py            # campeones y comparación de pilotos por temporada
-        └── history_plots.py      # gráficas entre temporadas
+├── src/
+│   ├── main.py                   # línea de comandos: análisis de una carrera
+│   ├── main_season.py            # línea de comandos: análisis de una temporada
+│   ├── main_history.py           # línea de comandos: comparativa de campeones
+│   ├── main_drivers.py           # línea de comandos: comparativa de pilotos
+│   └── f1analysis/               # paquete con la lógica
+│       ├── cache.py              # caché en disco de los datos de Jolpica
+│       ├── data.py               # datos de carrera desde Jolpica
+│       ├── analysis.py           # cálculos de carrera: delta con la pole, vuelta rápida...
+│       ├── styling.py            # colores de escudería y estilo por piloto
+│       ├── plots.py              # gráficas de carrera (matplotlib y seaborn)
+│       ├── season.py             # clasificaciones, puntos y opciones al título
+│       ├── season_plots.py       # gráficas de temporada (seaborn y plotly)
+│       ├── history.py            # campeones y comparación de pilotos por temporada
+│       └── history_plots.py      # gráficas entre temporadas
+├── tests/                        # tests con pytest
+│   ├── test_analysis.py
+│   ├── test_cache.py
+│   ├── test_data.py
+│   ├── test_history.py
+│   ├── test_season.py
+│   └── test_styling.py
+├── pytest.ini
+├── requirements.txt
+├── requirements-dev.txt
+├── .gitignore
+└── README.md
 ```
 
 ## Flujo de trabajo
@@ -186,7 +228,7 @@ Cada funcionalidad sigue el mismo ciclo en GitHub:
 1. Se abre un **issue** que describe lo que hay que hacer.
 2. Se trabaja en una **rama** propia (`feature/N-nombre`, `docs/N-nombre` o `refactor/N-nombre`).
 3. Cada **commit** empieza por el número del issue: `#N feat: ...`.
-4. Se abre un **pull request** cuya descripción incluye `Closes #N`.
+4. Se abre un **pull request** cuya descripción incluye `Closes #N`, y los tests se ejecutan solos en GitHub Actions.
 5. Al hacer el merge, el issue se cierra solo y la rama se borra.
 
 ## Tecnologías
@@ -197,6 +239,8 @@ Cada funcionalidad sigue el mismo ciclo en GitHub:
 - matplotlib
 - seaborn
 - plotly
+- pytest
+- GitHub Actions
 
 ## Próximos pasos
 
@@ -209,6 +253,11 @@ Cada funcionalidad sigue el mismo ciclo en GitHub:
 - [x] Mover los scripts de ejemplo a una carpeta `examples/`.
 - [x] Comparativa de campeones entre temporadas.
 - [x] Comparar pilotos a lo largo de varias temporadas.
+- [x] Caché en disco de los datos de Jolpica.
+- [x] Tests con pytest e integración continua con GitHub Actions.
+- [ ] Duelos entre compañeros de equipo y campeonato de constructores.
+- [ ] Modelo predictivo de la posición final.
+- [ ] Dashboard interactivo con Streamlit.
 - [ ] Telemetría y mapa del circuito, si se dispone de acceso a los datos (requieren cuenta F1TV).
 
 ## Autor
