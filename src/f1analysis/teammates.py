@@ -5,7 +5,10 @@ from itertools import combinations
 import pandas as pd
 
 from .data import get_qualifying, get_race_results
-from .season import _get_schedule, _with_retry
+from .season import _with_retry
+
+# Tope de rondas que se intentan: el calendario más largo ha tenido 24.
+MAX_ROUNDS = 30
 
 SUMMARY_COLUMNS = [
     "constructorId",
@@ -68,17 +71,15 @@ def get_weekend_results(season, up_to_round=None, verbose=False):
     """Resultados de todos los fines de semana de una temporada.
 
     Devuelve un DataFrame con una fila por piloto y ronda (columna 'round').
-    Se detiene en la primera ronda sin resultados.
+    Recorre las rondas en orden y se detiene en la primera sin resultados,
+    así que no necesita el calendario.
     """
-    schedule = _get_schedule(season)
-    last_round = max(int(r) for r in schedule["RoundNumber"])
-    if up_to_round is not None:
-        last_round = min(up_to_round, last_round)
+    last_round = MAX_ROUNDS if up_to_round is None else up_to_round
 
     frames = []
     for round_ in range(1, last_round + 1):
         if verbose:
-            print(f"  Descargando ronda {round_}/{last_round}...")
+            print(f"  Descargando ronda {round_}...")
         weekend = _weekend(season, round_)
         if weekend is None:
             break  # carrera aún no disputada

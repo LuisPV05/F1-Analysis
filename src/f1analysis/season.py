@@ -16,6 +16,9 @@ SPRINT_WIN_POINTS = 8
 # Nombres que FastF1 ha usado para los fines de semana con sprint.
 SPRINT_FORMATS = {"sprint", "sprint_shootout", "sprint_qualifying"}
 
+# Columnas del calendario que usa el proyecto.
+SCHEDULE_COLUMNS = ["RoundNumber", "EventName", "EventFormat"]
+
 RETRIES = 5
 RETRY_WAIT = 3.0  # segundos; se multiplica por el número de intento
 
@@ -32,10 +35,38 @@ def _with_retry(call):
             time.sleep(RETRY_WAIT * (attempt + 1))
 
 
+def _download_schedule(season):
+    """Descarga el calendario, reintentando si FastF1 no consigue cargarlo.
+
+    FastF1 se traga los errores de la API (como 'Too Many Requests') y lanza
+    un ValueError, por eso se reintenta con ese error.
+    """
+    for attempt in range(RETRIES):
+        try:
+            schedule = fastf1.get_event_schedule(
+                season, include_testing=False, backend="ergast"
+            )
+        except ValueError:
+            if attempt == RETRIES - 1:
+                raise
+            time.sleep(RETRY_WAIT * (attempt + 1))
+        else:
+            # DataFrame normal con solo las columnas necesarias
+            return pd.DataFrame(
+                {column: schedule[column].to_numpy() for column in SCHEDULE_COLUMNS}
+            )
+
+
 def _get_schedule(season):
-    """Calendario de la temporada (sin test de pretemporada) vía Jolpica."""
-    return fastf1.get_event_schedule(
-        season, include_testing=False, backend="ergast"
+    """Calendario de la temporada (sin test de pretemporada) vía Jolpica.
+
+    Devuelve un DataFrame con RoundNumber, EventName y EventFormat, usando la
+    caché en disco.
+    """
+    return cached_dataframe(
+        "schedule",
+        lambda: _download_schedule(season),
+        season=season,
     )
 
 
