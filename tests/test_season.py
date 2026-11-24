@@ -1,7 +1,9 @@
 """Tests de los cálculos de temporada y de los reintentos."""
 
+import fastf1.ergast.interface as ergast_interface
 import pandas as pd
 import pytest
+import requests
 from fastf1.exceptions import ErgastInvalidRequestError
 
 from f1analysis import season
@@ -116,3 +118,54 @@ def test_with_retry_gives_up_after_all_attempts(monkeypatch):
     with pytest.raises(ErgastInvalidRequestError):
         season._with_retry(always_busy)
     assert len(calls) == season.RETRIES
+
+
+def test_with_retry_retries_slow_responses_and_dropped_connections(monkeypatch):
+    waits = []
+    monkeypatch.setattr(season.time, "sleep", waits.append)
+    errors = [
+        requests.exceptions.ReadTimeout("respuesta lenta"),
+        requests.exceptions.ConnectionError("conexión cortada"),
+    ]
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if errors:
+            raise errors.pop(0)
+        return "ok"
+
+    assert season._with_retry(flaky) == "ok"
+    assert len(calls) == 3
+    assert waits == [season.RETRY_WAIT, season.RETRY_WAIT * 2]
+
+
+def test_with_retry_gives_up_after_all_attempts_on_timeouts(monkeypatch):
+    monkeypatch.setattr(season.time, "sleep", lambda seconds: None)
+    calls = []
+
+    def always_slow():
+        calls.append(1)
+        raise requests.exceptions.ReadTimeout("respuesta lenta")
+
+    with pytest.raises(requests.exceptions.ReadTimeout):
+        season._with_retry(always_slow)
+    assert len(calls) == season.RETRIES
+
+
+def test_with_retry_does_not_retry_certificate_errors(monkeypatch):
+    monkeypatch.setattr(season.time, "sleep", lambda seconds: None)
+    calls = []
+
+    def bad_certificate():
+        calls.append(1)
+        raise requests.exceptions.SSLError("certificate verify failed")
+
+    with pytest.raises(requests.exceptions.SSLError):
+        season._with_retry(bad_certificate)
+    assert len(calls) == 1
+
+
+def test_request_timeout_is_longer_than_the_fastf1_default():
+    assert season.REQUEST_TIMEOUT > 5
+    assert ergast_interface.TIMEOUT == season.REQUEST_TIMEOUT

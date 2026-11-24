@@ -3,7 +3,9 @@
 import time
 
 import fastf1
+import fastf1.ergast.interface as ergast_interface
 import pandas as pd
+import requests
 from fastf1.ergast import Ergast
 from fastf1.exceptions import ErgastInvalidRequestError
 
@@ -22,9 +24,19 @@ SCHEDULE_COLUMNS = ["RoundNumber", "EventName", "EventFormat"]
 RETRIES = 5
 RETRY_WAIT = 3.0  # segundos; se multiplica por el número de intento
 
+# FastF1 espera solo 5 s a Jolpica, poco si la red o el servidor van lentos.
+# Es una constante del módulo de FastF1 que se lee en cada petición.
+REQUEST_TIMEOUT = 20.0
+ergast_interface.TIMEOUT = REQUEST_TIMEOUT
+
 
 def _with_retry(call):
-    """Ejecuta 'call()' y reintenta si Jolpica responde 'Too Many Requests'."""
+    """Ejecuta 'call()' y reintenta ante fallos temporales de la red.
+
+    Se reintenta si Jolpica responde 'Too Many Requests', si la respuesta
+    tarda demasiado o si la conexión falla. Un error de certificado SSL no se
+    reintenta: no se arregla solo y hay que resolverlo en la red.
+    """
     for attempt in range(RETRIES):
         try:
             return call()
@@ -32,7 +44,12 @@ def _with_retry(call):
             too_many = "Too Many Requests" in str(error)
             if not too_many or attempt == RETRIES - 1:
                 raise
-            time.sleep(RETRY_WAIT * (attempt + 1))
+        except requests.exceptions.SSLError:
+            raise
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt == RETRIES - 1:
+                raise
+        time.sleep(RETRY_WAIT * (attempt + 1))
 
 
 def _download_schedule(season):

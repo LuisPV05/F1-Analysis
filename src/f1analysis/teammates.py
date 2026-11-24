@@ -5,7 +5,6 @@ from itertools import combinations
 import pandas as pd
 
 from .data import get_qualifying, get_race_results
-from .season import _with_retry
 
 # Tope de rondas que se intentan: el calendario más largo ha tenido 24.
 MAX_ROUNDS = 30
@@ -30,15 +29,16 @@ def _weekend(season, round_):
 
     Columnas: driverId, driverCode, constructorId, constructorName,
     race_pos, points y quali_pos (NaN si no hay datos de clasificación).
-    Devuelve None si la carrera todavía no se ha disputado.
+    Devuelve None si la carrera todavía no se ha disputado. Los reintentos
+    ante fallos de red los hace la capa de datos.
     """
     try:
-        race = _with_retry(lambda: get_race_results(season, round_))
+        race = get_race_results(season, round_)
     except ValueError:
         return None
 
     try:
-        qualifying = _with_retry(lambda: get_qualifying(season, round_))
+        qualifying = get_qualifying(season, round_)
     except ValueError:
         qualifying = None
 

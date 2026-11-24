@@ -4,14 +4,16 @@ import math
 
 import pandas as pd
 import pytest
+import requests
 
+from f1analysis import data, season
 from f1analysis.data import add_stints, to_seconds
 
 
 @pytest.mark.parametrize(
     "value, expected",
     [
-        (pd.Timedelta(minutes=1, seconds=29.99), 89.99),
+        (pd.Timedelta("0 days 00:01:29.990000"), 89.99),
         ("1:29.990", 89.99),
         ("0:59.500", 59.5),
         ("29.5", 29.5),
@@ -63,3 +65,27 @@ def test_add_stints_does_not_modify_the_input():
     laps = make_laps()
     add_stints(laps, make_pit_stops([("a", 1, 2)]))
     assert "stint" not in laps.columns
+
+
+class FakeResponse:
+    def __init__(self, content):
+        self.content = content
+
+
+def test_fetch_all_retries_a_slow_page_and_joins_all_pages(monkeypatch):
+    monkeypatch.setattr(season.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(data, "PAGE_SIZE", 2)
+    pages = [pd.DataFrame({"x": [1, 2]}), pd.DataFrame({"x": [3]})]
+    offsets = []
+
+    def method(season, round, limit, offset):
+        offsets.append(offset)
+        if len(offsets) == 1:
+            raise requests.exceptions.ReadTimeout("respuesta lenta")
+        return FakeResponse([pages[offset // 2]])
+
+    result = data._fetch_all(method, 2023, 1)
+
+    assert result["x"].tolist() == [1, 2, 3]
+    # El primer intento falla y se repite la misma página antes de pasar a la siguiente
+    assert offsets == [0, 0, 2]

@@ -1,9 +1,12 @@
 """Descarga y limpieza de datos de F1 desde Jolpica (vía fastf1.ergast)."""
 
+from functools import partial
+
 import pandas as pd
 from fastf1.ergast import Ergast
 
 from .cache import cached_dataframe
+from .season import _with_retry
 
 PAGE_SIZE = 100  # filas por petición a la API
 
@@ -35,13 +38,20 @@ def _first_table(response, season, round_):
 def _fetch_all(method, season, round_):
     """Descarga todas las páginas de una consulta paginada.
 
-    Devuelve un DataFrame (vacío si no hay datos).
+    Cada página se pide con reintentos. Devuelve un DataFrame (vacío si no
+    hay datos).
     """
     frames = []
     offset = 0
     while True:
-        response = method(
-            season=season, round=round_, limit=PAGE_SIZE, offset=offset
+        response = _with_retry(
+            partial(
+                method,
+                season=season,
+                round=round_,
+                limit=PAGE_SIZE,
+                offset=offset,
+            )
         )
         if not response.content or response.content[0].empty:
             break
@@ -56,7 +66,9 @@ def _fetch_all(method, season, round_):
 
 
 def _download_race_results(season, round_):
-    response = Ergast().get_race_results(season=season, round=round_)
+    response = _with_retry(
+        lambda: Ergast().get_race_results(season=season, round=round_)
+    )
     return _first_table(response, season, round_)
 
 
@@ -71,7 +83,9 @@ def get_race_results(season, round_):
 
 
 def _download_qualifying(season, round_):
-    response = Ergast().get_qualifying_results(season=season, round=round_)
+    response = _with_retry(
+        lambda: Ergast().get_qualifying_results(season=season, round=round_)
+    )
     df = _first_table(response, season, round_)
     for col in ["Q1", "Q2", "Q3"]:
         df[col] = df[col].apply(to_seconds)
