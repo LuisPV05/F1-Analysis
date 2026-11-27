@@ -10,6 +10,12 @@ from f1analysis import season
 from f1analysis.season import max_points_remaining, who_can_win
 
 
+@pytest.fixture(autouse=True)
+def no_throttle(monkeypatch):
+    """Sin pausa entre peticiones, salvo en el test que la comprueba."""
+    monkeypatch.setattr(season, "MIN_INTERVAL", 0.0)
+
+
 def make_standings(with_code=True):
     df = pd.DataFrame(
         {
@@ -94,6 +100,19 @@ def test_with_retry_retries_when_jolpica_says_too_many_requests(monkeypatch):
     assert waits == [season.RETRY_WAIT, season.RETRY_WAIT * 2]
 
 
+def test_with_retry_waits_twice_as_long_after_each_failure(monkeypatch):
+    waits = []
+    monkeypatch.setattr(season.time, "sleep", waits.append)
+
+    def always_busy():
+        raise ErgastInvalidRequestError("Too Many Requests")
+
+    with pytest.raises(ErgastInvalidRequestError):
+        season._with_retry(always_busy)
+    wait = season.RETRY_WAIT
+    assert waits == [wait, wait * 2, wait * 4, wait * 8]
+
+
 def test_with_retry_does_not_retry_other_errors(monkeypatch):
     monkeypatch.setattr(season.time, "sleep", lambda seconds: None)
     calls = []
@@ -169,3 +188,22 @@ def test_with_retry_does_not_retry_certificate_errors(monkeypatch):
 def test_request_timeout_is_longer_than_the_fastf1_default():
     assert season.REQUEST_TIMEOUT > 5
     assert ergast_interface.TIMEOUT == season.REQUEST_TIMEOUT
+
+
+def test_throttle_leaves_a_gap_between_consecutive_requests(monkeypatch):
+    monkeypatch.setattr(season, "MIN_INTERVAL", 0.3)
+    monkeypatch.setattr(season, "_last_request", 0.0)
+    clock = [100.0]
+    waits = []
+
+    def fake_sleep(seconds):
+        waits.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr(season.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(season.time, "sleep", fake_sleep)
+
+    season._throttle()  # primera petición: no hay que esperar
+    season._throttle()  # segunda, justo después: espera el margen
+
+    assert waits == [pytest.approx(0.3)]
