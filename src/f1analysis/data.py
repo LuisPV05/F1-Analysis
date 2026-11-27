@@ -82,6 +82,60 @@ def get_race_results(season, round_):
     )
 
 
+def _download_season_race_results(season):
+    """Resultados de todas las carreras de una temporada, en pocas peticiones.
+
+    Cada página de la API trae hasta PAGE_SIZE filas, de varias carreras
+    (unas cinco). Una carrera puede quedar partida entre dos páginas, por eso
+    se etiqueta cada tabla con su ronda y se juntan todas. Devuelve None si no
+    hay resultados.
+    """
+    ergast = Ergast()
+    frames = []
+    offset = 0
+    while True:
+        response = _with_retry(
+            partial(
+                ergast.get_race_results,
+                season=season,
+                limit=PAGE_SIZE,
+                offset=offset,
+            )
+        )
+        if not response.content:
+            break
+
+        rows = 0
+        for table, round_ in zip(response.content, response.description["round"]):
+            table = table.copy()
+            table.insert(0, "round", int(round_))
+            frames.append(table)
+            rows += len(table)
+
+        if rows < PAGE_SIZE:
+            break
+        offset += PAGE_SIZE
+
+    if not frames:
+        return None
+    return pd.concat(frames, ignore_index=True)
+
+
+def get_season_race_results(season):
+    """Resultados de todas las carreras de una temporada (columna 'round').
+
+    Tiene las mismas columnas que get_race_results, más 'round'.
+    """
+    result = cached_dataframe(
+        "season_race_results",
+        lambda: _download_season_race_results(season),
+        season=season,
+    )
+    if result is None:
+        raise ValueError(f"No hay resultados para la temporada {season}.")
+    return result
+
+
 def _download_qualifying(season, round_):
     response = _with_retry(
         lambda: Ergast().get_qualifying_results(season=season, round=round_)

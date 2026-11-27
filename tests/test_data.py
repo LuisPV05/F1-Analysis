@@ -6,8 +6,14 @@ import pandas as pd
 import pytest
 import requests
 
-from f1analysis import data, season
+from f1analysis import cache, data, season
 from f1analysis.data import add_stints, to_seconds
+
+
+@pytest.fixture(autouse=True)
+def no_throttle(monkeypatch):
+    """Sin pausa entre peticiones: los tests no deben esperar."""
+    monkeypatch.setattr(season, "MIN_INTERVAL", 0.0)
 
 
 @pytest.mark.parametrize(
@@ -89,3 +95,54 @@ def test_fetch_all_retries_a_slow_page_and_joins_all_pages(monkeypatch):
     assert result["x"].tolist() == [1, 2, 3]
     # El primer intento falla y se repite la misma página antes de pasar a la siguiente
     assert offsets == [0, 0, 2]
+
+
+class FakeSeasonResponse:
+    """Respuesta con varias carreras: una tabla por carrera y su descripción."""
+
+    def __init__(self, tables, rounds):
+        self.content = tables
+        self.description = pd.DataFrame({"round": rounds})
+
+
+class FakeErgast:
+    def __init__(self, pages):
+        self.pages = pages
+        self.offsets = []
+
+    def get_race_results(self, season, limit, offset):
+        self.offsets.append(offset)
+        return self.pages[offset // limit]
+
+
+def test_download_season_race_results_joins_pages_and_labels_each_round(monkeypatch):
+    monkeypatch.setattr(data, "PAGE_SIZE", 3)
+    pages = [
+        # La ronda 2 queda partida entre las dos páginas
+        FakeSeasonResponse(
+            [pd.DataFrame({"driverId": ["a", "b"]}), pd.DataFrame({"driverId": ["a"]})],
+            ["1", "2"],
+        ),
+        FakeSeasonResponse([pd.DataFrame({"driverId": ["b"]})], ["2"]),
+    ]
+    fake = FakeErgast(pages)
+    monkeypatch.setattr(data, "Ergast", lambda: fake)
+
+    result = data._download_season_race_results(2024)
+
+    assert result["round"].tolist() == [1, 1, 2, 2]
+    assert result["driverId"].tolist() == ["a", "b", "a", "b"]
+    assert fake.offsets == [0, 3]
+
+
+def test_download_season_race_results_without_data_returns_none(monkeypatch):
+    fake = FakeErgast([FakeSeasonResponse([], [])])
+    monkeypatch.setattr(data, "Ergast", lambda: fake)
+    assert data._download_season_race_results(2024) is None
+
+
+def test_get_season_race_results_without_data_fails(monkeypatch):
+    monkeypatch.setenv(cache.DISABLE_VARIABLE, "1")
+    monkeypatch.setattr(data, "_download_season_race_results", lambda season: None)
+    with pytest.raises(ValueError):
+        data.get_season_race_results(2024)
