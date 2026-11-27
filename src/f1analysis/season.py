@@ -22,7 +22,13 @@ SPRINT_FORMATS = {"sprint", "sprint_shootout", "sprint_qualifying"}
 SCHEDULE_COLUMNS = ["RoundNumber", "EventName", "EventFormat"]
 
 RETRIES = 5
-RETRY_WAIT = 3.0  # segundos; se multiplica por el número de intento
+RETRY_WAIT = 5.0  # segundos; se duplica en cada nuevo intento (5, 10, 20, 40)
+
+# Jolpica limita las peticiones y el límite real parece más estricto de lo
+# documentado, así que se deja un margen entre peticiones a la red (las que
+# salen de la caché no cuentan). Si sigue habiendo 'Too Many Requests', súbelo.
+MIN_INTERVAL = 1.0  # segundos
+_last_request = 0.0
 
 # FastF1 espera solo 5 s a Jolpica, poco si la red o el servidor van lentos.
 # Es una constante del módulo de FastF1 que se lee en cada petición.
@@ -30,14 +36,26 @@ REQUEST_TIMEOUT = 20.0
 ergast_interface.TIMEOUT = REQUEST_TIMEOUT
 
 
+def _throttle():
+    """Espera lo necesario para dejar MIN_INTERVAL entre dos peticiones."""
+    global _last_request
+    wait = MIN_INTERVAL - (time.monotonic() - _last_request)
+    if wait > 0:
+        time.sleep(wait)
+    _last_request = time.monotonic()
+
+
 def _with_retry(call):
     """Ejecuta 'call()' y reintenta ante fallos temporales de la red.
 
     Se reintenta si Jolpica responde 'Too Many Requests', si la respuesta
-    tarda demasiado o si la conexión falla. Un error de certificado SSL no se
-    reintenta: no se arregla solo y hay que resolverlo en la red.
+    tarda demasiado o si la conexión falla, esperando el doble tras cada
+    fallo. Un error de certificado SSL no se reintenta: no se arregla solo y
+    hay que resolverlo en la red. Antes de cada intento se respeta el margen
+    mínimo entre peticiones.
     """
     for attempt in range(RETRIES):
+        _throttle()
         try:
             return call()
         except ErgastInvalidRequestError as error:
@@ -49,7 +67,7 @@ def _with_retry(call):
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             if attempt == RETRIES - 1:
                 raise
-        time.sleep(RETRY_WAIT * (attempt + 1))
+        time.sleep(RETRY_WAIT * 2**attempt)
 
 
 def _download_schedule(season):
@@ -59,6 +77,7 @@ def _download_schedule(season):
     un ValueError, por eso se reintenta con ese error.
     """
     for attempt in range(RETRIES):
+        _throttle()
         try:
             schedule = fastf1.get_event_schedule(
                 season, include_testing=False, backend="ergast"
@@ -66,7 +85,7 @@ def _download_schedule(season):
         except ValueError:
             if attempt == RETRIES - 1:
                 raise
-            time.sleep(RETRY_WAIT * (attempt + 1))
+            time.sleep(RETRY_WAIT * 2**attempt)
         else:
             # DataFrame normal con solo las columnas necesarias
             return pd.DataFrame(
